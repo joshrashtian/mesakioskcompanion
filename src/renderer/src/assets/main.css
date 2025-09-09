@@ -1,0 +1,39 @@
+@import 'tailwindcss';
+@import './base.css';
+
+@theme {
+  --font-eudoxus: "Eudoxus", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+  --font-sans: "Eudoxus", ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+}
+
+@font-face {
+  font-family: "Eudoxus";
+  src: url("../assets/fonts/EudoxusSans-ExtraLight-BF659b6cb1e7092.ttf");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Eudoxus";
+  src: url("../assets/fonts/EudoxusSans-Medium.ttf");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Eudoxus";
+  src: url("../assets/fonts/EudoxusSans-Bold.ttf");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Eudoxus";
+  src: url("../assets/fonts/EudoxusSans-ExtraBold-BF659b6cb1b96c9.ttf");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
