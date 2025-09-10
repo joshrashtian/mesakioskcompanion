@@ -106,14 +106,28 @@ app.whenReady().then(() => {
     return true
   })
 
-  // Allow camera/mic for mesaconnect only
+  // Allow camera/mic for mesaconnect and our own renderer origins
   const ses = session.defaultSession
   ses.setPermissionRequestHandler((_webContents, permission, callback, details) => {
     const requestingUrl = new URL(details.requestingUrl)
     const isMesaConnect = requestingUrl.hostname.endsWith('mesaconnect.io')
-    if (isMesaConnect && permission === 'media') {
-      callback(true)
-      return
+    const isFile = requestingUrl.protocol === 'file:'
+    let isDevRenderer = false
+    const devUrl = process.env['ELECTRON_RENDERER_URL']
+    if (devUrl) {
+      try {
+        const devHost = new URL(devUrl).host
+        isDevRenderer = requestingUrl.host === devHost
+      } catch {
+        isDevRenderer = false
+      }
+    }
+
+    if (permission === 'media') {
+      if (isMesaConnect || isFile || isDevRenderer) {
+        callback(true)
+        return
+      }
     }
     callback(false)
   })

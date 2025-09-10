@@ -147,10 +147,11 @@ export default function CameraView(): React.JSX.Element {
   return (
     <div className="h-full w-full flex flex-col">
       <div className="p-4 fixed lg:top-12 overflow-x-scroll lg:left-24 lg:right-24 z-10  bg-zinc-400/70 rounded-3xl px-24 flex items-center gap-3">
+        <div className="h-6 w-20 mr-2 drag rounded cursor-move" />
         <div className="flex flex-col">
           <label className="text-sm text-zinc-300">Display / Camera</label>
           <select
-            className="bg-zinc-900 text-zinc-100 rounded px-2 py-1 border border-zinc-700"
+            className="bg-zinc-900 text-zinc-100 rounded px-2 py-1 border border-zinc-700 no-drag"
             value={selectedVideoDeviceId || ''}
             onChange={(e) => setSelectedVideoDeviceId(e.target.value)}
           >
@@ -164,13 +165,18 @@ export default function CameraView(): React.JSX.Element {
 
         <div className="flex flex-col">
           <label className="text-sm text-zinc-300">Mirror</label>
-          <input type="checkbox" checked={mirror} onChange={(e) => setMirror(e.target.checked)} />
+          <input
+            className="no-drag"
+            type="checkbox"
+            checked={mirror}
+            onChange={(e) => setMirror(e.target.checked)}
+          />
         </div>
 
         <div className="flex flex-col">
           <label className="text-sm text-zinc-300">Resolution</label>
           <select
-            className="bg-zinc-900 text-zinc-100 rounded px-2 py-1 border border-zinc-700"
+            className="bg-zinc-900 text-zinc-100 rounded px-2 py-1 border border-zinc-700 no-drag"
             onChange={(e) => {
               const val = e.target.value
               if (val === 'auto') setQuality({})
@@ -195,7 +201,7 @@ export default function CameraView(): React.JSX.Element {
             type="number"
             min={1}
             max={120}
-            className="w-20 bg-zinc-900 text-zinc-100 rounded px-2 py-1 border border-zinc-700"
+            className="w-20 bg-zinc-900 text-zinc-100 rounded px-2 py-1 border border-zinc-700 no-drag"
             value={quality.fps ?? ''}
             onChange={(e) =>
               setQuality((q) => ({
@@ -210,7 +216,7 @@ export default function CameraView(): React.JSX.Element {
         <div className="flex flex-col">
           <label className="text-sm text-zinc-300">Audio In</label>
           <select
-            className="bg-zinc-900 text-zinc-100 rounded px-2 py-1 border border-zinc-700"
+            className="bg-zinc-900 text-zinc-100 rounded px-2 py-1 border border-zinc-700 no-drag"
             value={selectedAudioDeviceId || ''}
             onChange={(e) => setSelectedAudioDeviceId(e.target.value)}
           >
@@ -225,7 +231,12 @@ export default function CameraView(): React.JSX.Element {
 
         <div className="flex flex-col">
           <label className="text-sm text-zinc-300">Mute</label>
-          <input type="checkbox" checked={muted} onChange={(e) => setMuted(e.target.checked)} />
+          <input
+            className="no-drag"
+            type="checkbox"
+            checked={muted}
+            onChange={(e) => setMuted(e.target.checked)}
+          />
         </div>
 
         <div className="flex flex-col">
@@ -237,6 +248,7 @@ export default function CameraView(): React.JSX.Element {
             step={0.01}
             value={volume}
             onChange={(e) => setVolume(Number(e.target.value))}
+            className="no-drag"
           />
         </div>
 
@@ -244,7 +256,7 @@ export default function CameraView(): React.JSX.Element {
         <div className="flex flex-col">
           <label className="text-sm text-zinc-300">Screen</label>
           <select
-            className="bg-zinc-900 text-zinc-100 rounded px-2 py-1 border border-zinc-700"
+            className="bg-zinc-900 text-zinc-100 rounded px-2 py-1 border border-zinc-700 no-drag"
             onChange={async (e) => {
               const id = Number(e.target.value)
               if (!Number.isNaN(id)) await window.api.moveToDisplayAndFullscreen(id)
@@ -263,7 +275,7 @@ export default function CameraView(): React.JSX.Element {
           </select>
         </div>
         <button
-          className="ml-2 px-3 py-1 rounded bg-zinc-800 text-zinc-100 border border-zinc-700 hover:bg-zinc-700"
+          className="ml-2 px-3 py-1 rounded bg-zinc-800 text-zinc-100 border border-zinc-700 hover:bg-zinc-700 no-drag"
           onClick={() => window.api.exitFullscreen()}
         >
           Exit Fullscreen
