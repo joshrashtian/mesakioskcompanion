@@ -414,15 +414,15 @@ export default function TabManager({
   return (
     <div className="h-full w-full flex flex-col">
       {/* Tab Bar */}
-      <div className="flex items-center bg-zinc-800 border-b border-zinc-700 px-2 py-1">
-        <div className="flex items-center gap-1 flex-1 overflow-x-auto">
+      <div className={`${theme.page?.webview?.tabBarBackground}`}>
+        <div className="flex items-center gap-4 flex-1 overflow-x-auto">
           {tabs.map((tab) => (
             <div
               key={tab.id}
-              className={`flex items-center gap-2 px-3 py-2 rounded-t-lg cursor-pointer min-w-0 max-w-48 group ${
+              className={`flex flex-row px-4 w-64 gap-3 py-2 duration-300 cursor-pointer group ${
                 tab.id === activeTabId
-                  ? 'bg-zinc-700 border-t border-l border-r border-zinc-600'
-                  : 'bg-zinc-800 hover:bg-zinc-750'
+                  ? theme.page?.webview?.tabActive
+                  : theme.page?.webview?.tabBackground
               }`}
               onClick={() => switchToTab(tab.id)}
             >
@@ -433,7 +433,7 @@ export default function TabManager({
                   e.stopPropagation()
                   closeTab(tab.id)
                 }}
-                className="text-zinc-400 hover:text-zinc-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="text-white hover:text-zinc-200 opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <IoClose className="text-sm" />
               </button>
@@ -450,15 +450,9 @@ export default function TabManager({
           <IoAdd className="text-lg" />
         </button>
       </div>
-
       {/* Navigation Controls */}
       {activeTab && (
         <div className={`p-4 flex flex-col gap-3 ${theme.page?.webview?.background}`}>
-          <div className={`flex flex-row items-center gap-2 ${theme.page?.webview?.tabBackground}`}>
-            {getWebsiteIcon(activeTab.url)}
-            <p className="no-drag truncate flex-1">{activeTab.title}</p>
-          </div>
-
           <div className="flex items-center gap-3">
             <button
               onClick={handleBack}
@@ -508,7 +502,6 @@ export default function TabManager({
                   </motion.div>
                 ) : (
                   <motion.div
-                    initial={{ opacity: 0 }}
                     animate={{ opacity: 1, rotate: 0 }}
                     transition={{ duration: 0.5, type: 'spring' }}
                   >
@@ -520,7 +513,6 @@ export default function TabManager({
           </div>
         </div>
       )}
-
       {/* Tab Content */}
       <div className="flex-1 relative">
         {tabs.map((tab) => (
@@ -533,7 +525,6 @@ export default function TabManager({
           </div>
         ))}
       </div>
-
       {/* Debug info for active tab */}
       {activeTab && (
         <div className="hidden">
