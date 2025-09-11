@@ -1,9 +1,9 @@
 import Versions from './components/Versions'
 import CameraView from './components/CameraView'
-import MesaConnectView from './components/MesaConnectView'
+import TabManager from './components/TabManager'
 import { Routes, Route, NavLink } from 'react-router-dom'
 import HomePage from './home/page'
-import { IoCamera, IoDesktop, IoHome, IoSettings } from 'react-icons/io5'
+import { IoDesktop, IoGlobe, IoHome, IoSettings } from 'react-icons/io5'
 import Magnetic from './components/Magnetic'
 //import electronLogo from './assets/electron.svg'
 
@@ -56,7 +56,7 @@ function App(): React.JSX.Element {
               }
               aria-label="MesaConnect"
             >
-              <IoCamera />
+              <IoGlobe />
             </NavLink>
           </Magnetic>
           <NavLink
@@ -77,7 +77,7 @@ function App(): React.JSX.Element {
             <Route path="/" element={<HomePage />} />
             <Route path="/versions" element={<Versions />} />
             <Route path="/camera" element={<CameraView />} />
-            <Route path="/mesaconnect" element={<MesaConnectView />} />
+            <Route path="/mesaconnect" element={<TabManager />} />
           </Routes>
         </main>
       </div>
