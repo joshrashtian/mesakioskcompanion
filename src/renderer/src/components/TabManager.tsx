@@ -20,6 +20,7 @@ import {
 import { VscRefresh } from 'react-icons/vsc'
 import { AnimatePresence, motion } from 'framer-motion'
 import { useTheme } from './useTheme'
+import WebsiteDashboard from './WebsiteDashboard'
 
 interface Tab {
   id: string
@@ -27,6 +28,7 @@ interface Tab {
   title: string
   isLoading: boolean
   inputUrl: string // URL in the input field (may differ from actual URL)
+  isNewTabPage: boolean // Whether this is the new tab dashboard page
   webviewRef: React.RefObject<import('electron').WebviewTag | null>
 }
 
@@ -139,19 +141,41 @@ export default function TabManager({
   const theme = useTheme()
 
   // Create a new tab
-  const createTab = (url: string = 'https://mesaconnect.io'): void => {
+  const createTab = (url: string = '', isNewTabPage: boolean = false): void => {
     const newTabId = `tab-${++tabIdCounter.current}`
-    const newTab: Tab = {
-      id: newTabId,
-      url,
-      title: 'Loading...',
-      isLoading: true,
-      inputUrl: url,
-      webviewRef: React.createRef<import('electron').WebviewTag>()
-    }
 
-    setTabs((prev) => [...prev, newTab])
-    setActiveTabId(newTabId)
+    if (isNewTabPage || url === '') {
+      // Create new tab page (dashboard)
+      const newTab: Tab = {
+        id: newTabId,
+        url: 'newtab://',
+        title: 'New Tab',
+        isLoading: false,
+        inputUrl: '',
+        isNewTabPage: true,
+        webviewRef: React.createRef<import('electron').WebviewTag>()
+      }
+      setTabs((prev) => [...prev, newTab])
+      setActiveTabId(newTabId)
+    } else {
+      // Create regular webview tab
+      const newTab: Tab = {
+        id: newTabId,
+        url,
+        title: 'Loading...',
+        isLoading: true,
+        inputUrl: url,
+        isNewTabPage: false,
+        webviewRef: React.createRef<import('electron').WebviewTag>()
+      }
+      setTabs((prev) => [...prev, newTab])
+      setActiveTabId(newTabId)
+    }
+  }
+
+  // Open a website in a new tab (called from WebsiteDashboard)
+  const openWebsiteInNewTab = (url: string): void => {
+    createTab(url, false)
   }
 
   // Close a tab
@@ -225,29 +249,54 @@ export default function TabManager({
 
   const handleGo = (): void => {
     const activeTab = tabs.find((tab) => tab.id === activeTabId)
-    if (activeTab?.webviewRef.current) {
-      let newUrl = activeTab.inputUrl
-      if (!newUrl.includes('://')) {
-        newUrl = `https://${newUrl}`
-      }
+    if (!activeTab || !activeTab.inputUrl.trim()) return
+
+    let newUrl = activeTab.inputUrl.trim()
+    if (!newUrl.includes('://')) {
+      newUrl = `https://${newUrl}`
+    }
+
+    if (activeTab.isNewTabPage) {
+      // Convert new tab page to webview tab
+      setTabs((prev) =>
+        prev.map((tab) =>
+          tab.id === activeTabId
+            ? {
+                ...tab,
+                url: newUrl,
+                inputUrl: newUrl,
+                isLoading: true,
+                isNewTabPage: false,
+                title: 'Loading...'
+              }
+            : tab
+        )
+      )
+    } else if (activeTab.webviewRef.current) {
+      // Regular navigation
       setTabs((prev) =>
         prev.map((tab) =>
           tab.id === activeTabId ? { ...tab, url: newUrl, inputUrl: newUrl, isLoading: true } : tab
         )
       )
       activeTab.webviewRef.current.loadURL(newUrl)
-      setTimeout(() => {
-        setTabs((prev) =>
-          prev.map((tab) => (tab.id === activeTabId ? { ...tab, isLoading: false } : tab))
-        )
-      }, 1000)
     }
+
+    setTimeout(() => {
+      setTabs((prev) =>
+        prev.map((tab) => (tab.id === activeTabId ? { ...tab, isLoading: false } : tab))
+      )
+    }, 1000)
   }
 
   // Initialize with first tab
   useEffect(() => {
     if (tabs.length === 0) {
-      createTab(initialUrl)
+      if (initialUrl && initialUrl !== 'https://mesaconnect.io') {
+        createTab(initialUrl, false)
+      } else {
+        createTab('', true) // Create new tab page by default
+      }
     }
   }, [tabs.length, initialUrl])
 
@@ -256,6 +305,9 @@ export default function TabManager({
   // Setup webview event handlers
   useEffect(() => {
     tabs.forEach((tab) => {
+      // Skip event handlers for new tab pages
+      if (tab.isNewTabPage) return
+
       const webview = tab.webviewRef.current
       if (!webview) return
 
@@ -270,6 +322,23 @@ export default function TabManager({
 
         try {
           const u = new URL(url)
+
+          // Special handling for Google redirects
+          if (u.hostname.includes('google.com') && u.searchParams.has('url')) {
+            // Google redirect - let it proceed but don't loop
+            return
+          }
+
+          // Prevent infinite redirects by checking if we're already on the same domain
+          const currentUrl = webview.getURL()
+          if (currentUrl) {
+            const currentDomain = new URL(currentUrl).hostname
+            if (currentDomain === u.hostname && url === currentUrl) {
+              console.log('Preventing redirect loop for:', url)
+              e.preventDefault?.()
+              return
+            }
+          }
 
           // List of domains that should stay in the webview
           const allowedDomains = [
@@ -414,37 +483,47 @@ export default function TabManager({
   return (
     <div className="h-full w-full flex flex-col">
       {/* Tab Bar */}
-      <div className={`${theme.page?.webview?.tabBarBackground}`}>
+      <div
+        className={
+          theme.page?.webview?.tabBarBackground ||
+          'flex items-center bg-zinc-800 border-b border-zinc-700 px-2 py-1'
+        }
+      >
         <div className="flex items-center gap-4 flex-1 overflow-x-auto">
           {tabs.map((tab) => (
-            <div
+            <motion.div
+              initial={{ opacity: 0, x: 10 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -10 }}
+              transition={{ duration: 0.1 }}
               key={tab.id}
-              className={`flex flex-row px-4 w-64 gap-3 py-2 duration-300 cursor-pointer group ${
+              className={`flex flex-row px-4 w-64 gap-3 py-2 duration-300 cursor-pointer group rounded-lg border ${
                 tab.id === activeTabId
-                  ? theme.page?.webview?.tabActive
-                  : theme.page?.webview?.tabBackground
+                  ? theme.page?.webview?.tabActive || 'bg-zinc-700 text-zinc-100'
+                  : theme.page?.webview?.tabBackground ||
+                    'bg-zinc-800 text-zinc-200 hover:bg-zinc-700'
               }`}
               onClick={() => switchToTab(tab.id)}
             >
               {getWebsiteIcon(tab.url)}
-              <span className="text-sm text-zinc-200 truncate flex-1">{tab.title}</span>
+              <span className="text-sm truncate flex-1">{tab.title}</span>
               <button
                 onClick={(e) => {
                   e.stopPropagation()
                   closeTab(tab.id)
                 }}
-                className="text-white hover:text-zinc-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                className={`${theme.page?.webview?.closeButton} hover:bg-red-100 dark:hover:bg-red-900 rounded-full p-1 transition-all duration-200`}
               >
                 <IoClose className="text-sm" />
               </button>
-            </div>
+            </motion.div>
           ))}
         </div>
 
         {/* New Tab Button */}
         <button
-          onClick={() => createTab()}
-          className="p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 rounded"
+          onClick={() => createTab('', true)}
+          className="p-2 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 rounded-lg transition-colors duration-200"
           title="New Tab"
         >
           <IoAdd className="text-lg" />
@@ -452,11 +531,16 @@ export default function TabManager({
       </div>
       {/* Navigation Controls */}
       {activeTab && (
-        <div className={`p-4 flex flex-col gap-3 ${theme.page?.webview?.background}`}>
-          <div className="flex items-center gap-3">
+        <div
+          className={`p-4 flex flex-col gap-3 ${theme.page?.webview?.background || 'bg-zinc-700 text-zinc-100'}`}
+        >
+          <nav className="flex items-center gap-3">
             <button
               onClick={handleBack}
-              className="bg-gray-500 text-zinc-100 hover:bg-gray-600 px-3 py-3 w-fit rounded-2xl border border-zinc-700 no-drag"
+              className={
+                theme.page?.webview?.buttons ||
+                'bg-gray-500 text-zinc-100 hover:bg-gray-600 px-3 py-3 w-fit rounded-2xl border border-zinc-700 no-drag'
+              }
               title="Go Back"
             >
               <IoArrowBack className="text-xl" />
@@ -464,7 +548,10 @@ export default function TabManager({
 
             <button
               onClick={handleForward}
-              className="bg-gray-500 text-zinc-100 hover:bg-gray-600 px-3 py-3 w-fit rounded-2xl border border-zinc-700 no-drag"
+              className={
+                theme.page?.webview?.buttons ||
+                'bg-gray-500 text-zinc-100 hover:bg-gray-600 px-3 py-3 w-fit rounded-2xl border border-zinc-700 no-drag'
+              }
               title="Go Forward"
             >
               <IoArrowForward className="text-xl" />
@@ -472,7 +559,10 @@ export default function TabManager({
 
             <button
               onClick={handleReload}
-              className="bg-gray-500 text-zinc-100 hover:bg-gray-600 px-3 py-3 w-fit rounded-2xl border border-zinc-700 no-drag"
+              className={
+                theme.page?.webview?.buttons ||
+                'bg-gray-500 text-zinc-100 hover:bg-gray-600 px-3 py-3 w-fit rounded-2xl border border-zinc-700 no-drag'
+              }
               title="Reload Page"
             >
               <VscRefresh className="text-xl" />
@@ -482,13 +572,16 @@ export default function TabManager({
               value={activeTab.inputUrl}
               onChange={(e) => updateTabInputUrl(activeTab.id, e.target.value)}
               type="text"
-              className={theme.page?.webview?.searchBar}
+              className={
+                theme.page?.webview?.searchBar ||
+                'bg-zinc-900 text-zinc-100 outline-none focus:outline-none px-3 py-3 min-w-[500px] rounded-3xl border border-zinc-700 no-drag'
+              }
               onKeyDown={(e) => e.key === 'Enter' && handleGo()}
             />
 
             <button
               onClick={handleGo}
-              className="bg-blue-500 text-zinc-100 hover:bg-blue-600 px-3 py-3 w-fit rounded-2xl border border-zinc-700 no-drag"
+              className="bg-blue-500 text-zinc-100 hover:bg-blue-600 px-3 py-3 w-fit rounded-2xl border border-zinc-700 no-drag transition-colors duration-200"
               title="Navigate to URL"
             >
               <AnimatePresence>
@@ -510,27 +603,37 @@ export default function TabManager({
                 )}
               </AnimatePresence>
             </button>
-          </div>
+          </nav>
         </div>
       )}
       {/* Tab Content */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative bg-white dark:bg-zinc-900">
         {tabs.map((tab) => (
           <div
             key={tab.id}
             className={`absolute inset-0 ${tab.id === activeTabId ? 'block' : 'hidden'}`}
           >
-            {/* Basic webview - you can expand this with your MesaConnectView features */}
-            <webview ref={tab.webviewRef} src={tab.url} style={{ width: '100%', height: '100%' }} />
+            {tab.isNewTabPage ? (
+              <WebsiteDashboard onOpenWebsite={openWebsiteInNewTab} />
+            ) : (
+              React.createElement('webview', {
+                // @ts-ignore: Electron webview attributes not recognized by React types
+                ref: tab.webviewRef,
+                src: tab.url,
+                className: 'w-full h-full',
+                useragent:
+                  'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                allowpopups: 'true',
+                webpreferences:
+                  'contextIsolation=no,nodeIntegration=no,sandbox=no,webSecurity=no,plugins=true,experimentalFeatures=true',
+                partition: 'persist:webview',
+                plugins: 'true'
+                // @ts-ignore: Electron webview attributes not recognized by React types
+              } as unknown as React.JSX.Element)
+            )}
           </div>
         ))}
       </div>
-      {/* Debug info for active tab */}
-      {activeTab && (
-        <div className="hidden">
-          Active tab: {activeTab.title} - {activeTab.url}
-        </div>
-      )}
     </div>
   )
 }

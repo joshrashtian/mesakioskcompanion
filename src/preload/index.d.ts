@@ -16,6 +16,21 @@ declare global {
       >
       moveToDisplayAndFullscreen: (displayId: number) => Promise<boolean>
       exitFullscreen: () => Promise<boolean>
+      spotify: {
+        authenticate: () => Promise<{ success: boolean; token?: string; error?: string }>
+        getToken: () => Promise<string | null>
+        logout: () => Promise<boolean>
+        isAuthenticated: () => Promise<boolean>
+      }
+      updater: {
+        checkForUpdates: () => Promise<any>
+        installUpdate: () => Promise<any>
+        getAppVersion: () => Promise<string>
+        onUpdateAvailable: (callback: (info: any) => void) => void
+        onDownloadProgress: (callback: (progress: any) => void) => void
+        onUpdateDownloaded: (callback: (info: any) => void) => void
+        removeAllListeners: () => void
+      }
     }
   }
 }

@@ -1,9 +1,61 @@
 import { app, shell, BrowserWindow, ipcMain, screen, session } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater'
+import * as dotenv from 'dotenv'
 import icon from '../../resources/icon.png?asset'
+import SpotifyAuth from './spotify-auth'
+
+// Load environment variables from .env file
+dotenv.config()
 
 let mainWindow: BrowserWindow | null = null
+let spotifyAuth: SpotifyAuth | null = null
+
+// Configure auto-updater
+if (!is.dev) {
+  autoUpdater.checkForUpdatesAndNotify()
+}
+
+// Auto-updater event handlers
+autoUpdater.on('checking-for-update', () => {
+  console.log('Checking for update...')
+})
+
+autoUpdater.on('update-available', (info) => {
+  console.log('Update available:', info)
+  // Notify renderer process
+  if (mainWindow) {
+    mainWindow.webContents.send('update-available', info)
+  }
+})
+
+autoUpdater.on('update-not-available', (info) => {
+  console.log('Update not available:', info)
+})
+
+autoUpdater.on('error', (err) => {
+  console.log('Error in auto-updater:', err)
+})
+
+autoUpdater.on('download-progress', (progressObj) => {
+  let log_message = 'Download speed: ' + progressObj.bytesPerSecond
+  log_message = log_message + ' - Downloaded ' + progressObj.percent + '%'
+  log_message = log_message + ' (' + progressObj.transferred + '/' + progressObj.total + ')'
+  console.log(log_message)
+  // Notify renderer process
+  if (mainWindow) {
+    mainWindow.webContents.send('download-progress', progressObj)
+  }
+})
+
+autoUpdater.on('update-downloaded', (info) => {
+  console.log('Update downloaded:', info)
+  // Notify renderer process
+  if (mainWindow) {
+    mainWindow.webContents.send('update-downloaded', info)
+  }
+})
 
 function createWindow(): void {
   // Create the browser window.
@@ -17,7 +69,12 @@ function createWindow(): void {
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
-      webviewTag: true
+      webviewTag: true,
+      plugins: true,
+      experimentalFeatures: true,
+      webSecurity: false,
+      contextIsolation: false,
+      nodeIntegration: true
     }
   })
 
@@ -38,6 +95,14 @@ function createWindow(): void {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
+
+// Enable Widevine DRM support for protected content (like Spotify)
+app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,WidevineEncryptedMedia')
+app.commandLine.appendSwitch('ignore-certificate-errors')
+app.commandLine.appendSwitch('disable-web-security')
+app.commandLine.appendSwitch('enable-widevine-cdm')
+app.commandLine.appendSwitch('widevine-cdm-path', app.getPath('userData'))
+app.commandLine.appendSwitch('widevine-cdm-version', '4.10.2710.0')
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
@@ -106,11 +171,77 @@ app.whenReady().then(() => {
     return true
   })
 
-  // Allow camera/mic for mesaconnect and our own renderer origins
+  // Initialize Spotify Auth
+  spotifyAuth = new SpotifyAuth()
+
+  // Spotify Authentication Handlers
+  ipcMain.handle('spotify-authenticate', async () => {
+    try {
+      if (!spotifyAuth) {
+        throw new Error('Spotify auth not initialized')
+      }
+      return await spotifyAuth.authenticate()
+    } catch (error: unknown) {
+      console.error('Spotify authentication error:', error)
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  })
+
+  ipcMain.handle('spotify-get-token', async () => {
+    try {
+      if (!spotifyAuth) {
+        return null
+      }
+      return await spotifyAuth.getValidToken()
+    } catch (error: unknown) {
+      console.error('Error getting Spotify token:', error)
+      return null
+    }
+  })
+
+  ipcMain.handle('spotify-logout', () => {
+    if (spotifyAuth) {
+      spotifyAuth.logout()
+    }
+    return true
+  })
+
+  ipcMain.handle('spotify-is-authenticated', () => {
+    return spotifyAuth?.isAuthenticated() || false
+  })
+
+  // Auto-updater IPC handlers
+  ipcMain.handle('check-for-updates', async () => {
+    if (is.dev) {
+      return { message: 'Updates not available in development mode' }
+    }
+    try {
+      const result = await autoUpdater.checkForUpdates()
+      return result
+    } catch (error) {
+      console.error('Error checking for updates:', error)
+      return { error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  })
+
+  ipcMain.handle('install-update', () => {
+    if (is.dev) {
+      return { message: 'Updates not available in development mode' }
+    }
+    autoUpdater.quitAndInstall()
+    return { message: 'Installing update...' }
+  })
+
+  ipcMain.handle('get-app-version', () => {
+    return app.getVersion()
+  })
+
+  // Allow camera/mic for mesaconnect and our own renderer origins, plus protected media for Spotify
   const ses = session.defaultSession
   ses.setPermissionRequestHandler((_webContents, permission, callback, details) => {
     const requestingUrl = new URL(details.requestingUrl)
     const isMesaConnect = requestingUrl.hostname.endsWith('mesaconnect.io')
+    const isSpotify = requestingUrl.hostname.includes('spotify.com')
     const isFile = requestingUrl.protocol === 'file:'
     let isDevRenderer = false
     const devUrl = process.env['ELECTRON_RENDERER_URL']
@@ -129,6 +260,21 @@ app.whenReady().then(() => {
         return
       }
     }
+
+    // Allow protected media content for Spotify and our own app
+    if (permission === 'mediaKeySystem') {
+      if (isSpotify || isMesaConnect || isFile || isDevRenderer) {
+        callback(true)
+        return
+      }
+    }
+
+    // Allow all permissions for our own renderer (including DRM)
+    if (isFile || isDevRenderer) {
+      callback(true)
+      return
+    }
+
     callback(false)
   })
 

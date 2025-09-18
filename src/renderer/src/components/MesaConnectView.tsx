@@ -400,6 +400,11 @@ export default function MesaConnectView(): React.JSX.Element {
           ref={webviewRef}
           src="https://mesaconnect.io"
           style={{ width: '100%', height: '100%' }}
+          useragent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          allowpopups="true"
+          webpreferences="contextIsolation=no,nodeIntegration=no,sandbox=no,webSecurity=no,plugins=true,experimentalFeatures=true"
+          partition="persist:webview"
+          plugins="true"
         />
       </div>
     </div>

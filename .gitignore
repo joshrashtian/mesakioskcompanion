@@ -4,3 +4,11 @@ out
 .DS_Store
 .eslintcache
 *.log*
+
+# Environment variables - DO NOT COMMIT
+.env
+.env.*
+!.env.example
+src/renderer/.env
+src/renderer/.env.*
+!src/renderer/.env.example
