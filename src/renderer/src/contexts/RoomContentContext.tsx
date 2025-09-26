@@ -105,11 +105,10 @@ const RoomContext = createContext<RoomContextType>({
 
 interface RoomContextProviderProps {
   children: React.ReactNode
+  roomId: string
 }
 
-const RoomContextProvider = ({ children }: RoomContextProviderProps): React.JSX.Element => {
-  const roomId = '1' // TODO: allow uses to update room id
-
+const RoomContextProvider = ({ children, roomId }: RoomContextProviderProps): React.JSX.Element => {
   const [data, setData] = useState<Room>({
     ...defaultRoomState,
     id: roomId || ''
@@ -209,7 +208,7 @@ const RoomContextProvider = ({ children }: RoomContextProviderProps): React.JSX.
         return false
       }
     },
-    [roomId, data.isAdmin]
+    [roomId, data.isAdmin, getExpirationStatus]
   )
 
   const getData = useCallback(async (): Promise<void> => {
@@ -430,7 +429,7 @@ const RoomContextProvider = ({ children }: RoomContextProviderProps): React.JSX.
     return () => {
       channel.unsubscribe()
     }
-  }, [roomId, getData])
+  }, [roomId, getData, getExpirationStatus])
 
   return (
     <RoomContext.Provider

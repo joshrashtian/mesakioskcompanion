@@ -1,6 +1,6 @@
 import { app, shell, BrowserWindow, ipcMain, screen, session } from 'electron'
 import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+// Removed @electron-toolkit/utils import to avoid early initialization issues
 import { autoUpdater } from 'electron-updater'
 import * as dotenv from 'dotenv'
 import icon from '../../resources/icon.png?asset'
@@ -9,53 +9,25 @@ import SpotifyAuth from './spotify-auth'
 // Load environment variables from .env file
 dotenv.config()
 
+// Check if we're in development mode (safe check that doesn't require app to be ready)
+const isDev =
+  process.env.NODE_ENV === 'development' || process.env.ELECTRON_RENDERER_URL !== undefined
+
 let mainWindow: BrowserWindow | null = null
 let spotifyAuth: SpotifyAuth | null = null
 
-// Configure auto-updater
-if (!is.dev) {
-  autoUpdater.checkForUpdatesAndNotify()
+// Enable Widevine DRM support for protected content (like Spotify)
+// These must be set before app.whenReady() but after app import
+try {
+  app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,WidevineEncryptedMedia')
+  app.commandLine.appendSwitch('ignore-certificate-errors')
+  app.commandLine.appendSwitch('disable-web-security')
+  app.commandLine.appendSwitch('enable-widevine-cdm')
+} catch (error) {
+  console.log('Could not set command line switches:', error)
 }
 
-// Auto-updater event handlers
-autoUpdater.on('checking-for-update', () => {
-  console.log('Checking for update...')
-})
-
-autoUpdater.on('update-available', (info) => {
-  console.log('Update available:', info)
-  // Notify renderer process
-  if (mainWindow) {
-    mainWindow.webContents.send('update-available', info)
-  }
-})
-
-autoUpdater.on('update-not-available', (info) => {
-  console.log('Update not available:', info)
-})
-
-autoUpdater.on('error', (err) => {
-  console.log('Error in auto-updater:', err)
-})
-
-autoUpdater.on('download-progress', (progressObj) => {
-  let log_message = 'Download speed: ' + progressObj.bytesPerSecond
-  log_message = log_message + ' - Downloaded ' + progressObj.percent + '%'
-  log_message = log_message + ' (' + progressObj.transferred + '/' + progressObj.total + ')'
-  console.log(log_message)
-  // Notify renderer process
-  if (mainWindow) {
-    mainWindow.webContents.send('download-progress', progressObj)
-  }
-})
-
-autoUpdater.on('update-downloaded', (info) => {
-  console.log('Update downloaded:', info)
-  // Notify renderer process
-  if (mainWindow) {
-    mainWindow.webContents.send('update-downloaded', info)
-  }
-})
+// Auto-updater will be configured after app is ready
 
 function createWindow(): void {
   // Create the browser window.
@@ -89,33 +61,86 @@ function createWindow(): void {
 
   // HMR for renderer base on electron-vite cli.
   // Load the remote URL for development or the local html file for production.
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+  if (isDev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
 
-// Enable Widevine DRM support for protected content (like Spotify)
-app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder,WidevineEncryptedMedia')
-app.commandLine.appendSwitch('ignore-certificate-errors')
-app.commandLine.appendSwitch('disable-web-security')
-app.commandLine.appendSwitch('enable-widevine-cdm')
-app.commandLine.appendSwitch('widevine-cdm-path', app.getPath('userData'))
-app.commandLine.appendSwitch('widevine-cdm-version', '4.10.2710.0')
-
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-  // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+  // Set Widevine CDM path and version now that userData is available
+  try {
+    app.commandLine.appendSwitch('widevine-cdm-path', app.getPath('userData'))
+    app.commandLine.appendSwitch('widevine-cdm-version', '4.10.2710.0')
+  } catch (error) {
+    console.log('Could not set Widevine CDM path:', error)
+  }
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
+  // Set app user model id for windows
+  if (process.platform === 'win32') {
+    app.setAppUserModelId('com.electron.mesakioskcompanion')
+  }
+
+  // Configure auto-updater (only in production)
+  if (!isDev) {
+    // Set up auto-updater event handlers
+    autoUpdater.on('checking-for-update', () => {
+      console.log('Checking for update...')
+    })
+
+    autoUpdater.on('update-available', (info) => {
+      console.log('Update available:', info)
+      // Notify renderer process
+      if (mainWindow) {
+        mainWindow.webContents.send('update-available', info)
+      }
+    })
+
+    autoUpdater.on('update-not-available', (info) => {
+      console.log('Update not available:', info)
+    })
+
+    autoUpdater.on('error', (err) => {
+      console.log('Error in auto-updater:', err)
+    })
+
+    autoUpdater.on('download-progress', (progressObj) => {
+      let log_message = 'Download speed: ' + progressObj.bytesPerSecond
+      log_message = log_message + ' - Downloaded ' + progressObj.percent + '%'
+      log_message = log_message + ' (' + progressObj.transferred + '/' + progressObj.total + ')'
+      console.log(log_message)
+      // Notify renderer process
+      if (mainWindow) {
+        mainWindow.webContents.send('download-progress', progressObj)
+      }
+    })
+
+    autoUpdater.on('update-downloaded', (info) => {
+      console.log('Update downloaded:', info)
+      // Notify renderer process
+      if (mainWindow) {
+        mainWindow.webContents.send('update-downloaded', info)
+      }
+    })
+
+    // Start checking for updates
+    autoUpdater.checkForUpdatesAndNotify()
+  }
+
+  // Handle window shortcuts manually
   app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
+    if (isDev) {
+      // Enable DevTools toggle with F12 in development
+      window.webContents.on('before-input-event', (_, input) => {
+        if (input.key === 'F12') {
+          window.webContents.toggleDevTools()
+        }
+      })
+    }
   })
 
   // IPC test
@@ -212,7 +237,7 @@ app.whenReady().then(() => {
 
   // Auto-updater IPC handlers
   ipcMain.handle('check-for-updates', async () => {
-    if (is.dev) {
+    if (isDev) {
       return { message: 'Updates not available in development mode' }
     }
     try {
@@ -225,7 +250,7 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('install-update', () => {
-    if (is.dev) {
+    if (isDev) {
       return { message: 'Updates not available in development mode' }
     }
     autoUpdater.quitAndInstall()

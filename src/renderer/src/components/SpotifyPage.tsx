@@ -76,6 +76,7 @@ const SpotifyPage: React.FC = () => {
   const [activeDevice, setActiveDevice] = useState<string | null>(null)
   const [showDeviceSelector, setShowDeviceSelector] = useState(false)
   const [webPlayerDeviceId, setWebPlayerDeviceId] = useState<string | null>(null)
+  const [, setVolume] = useState<number>(50)
 
   // Check authentication status
   useEffect(() => {
@@ -486,14 +487,22 @@ const SpotifyPage: React.FC = () => {
     }
   }
 
-  const handlePlayerStateChange = (state: {
-    track_window: { current_track: SpotifyTrack }
-    paused: boolean
-    position: number
-  }): void => {
-    // eslint-disable-line @typescript-eslint/no-explicit-any
-    if (state) {
-      setCurrentTrack(state.track_window.current_track)
+  const handlePlayerStateChange = (state: any): void => {
+    if (state && state.track_window && state.track_window.current_track) {
+      // Convert the web player track format to our SpotifyTrack format
+      const track: SpotifyTrack = {
+        id: state.track_window.current_track.id,
+        name: state.track_window.current_track.name,
+        artists: state.track_window.current_track.artists.map((artist: any) => ({
+          name: artist.name,
+          id: artist.uri.split(':').pop() || artist.uri // Extract ID from URI
+        })),
+        album: state.track_window.current_track.album,
+        duration_ms: state.track_window.current_track.duration_ms,
+        uri: state.track_window.current_track.uri
+      }
+
+      setCurrentTrack(track)
       setIsPlaying(!state.paused)
       setProgress(state.position)
     }

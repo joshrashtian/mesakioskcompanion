@@ -72,12 +72,13 @@ interface SpotifyWebPlayerProps {
 }
 
 const SpotifyWebPlayer: React.FC<SpotifyWebPlayerProps> = ({
-  onPlayerReady,
-  onPlayerStateChange
+  // eslint-disable-next-line react/prop-types
+  onPlayerReady, // eslint-disable-next-line @typescript-eslint/no-explicit-any, react/prop-types
+  onPlayerStateChange // eslint-disable-next-line @typescript-eslint/no-explicit-any
 }) => {
   const [player, setPlayer] = useState<SpotifyPlayer | null>(null)
-  const [deviceId, setDeviceId] = useState<string>('')
-  const [isReady, setIsReady] = useState(false)
+  const [, setDeviceId] = useState<string>('')
+  const [, setIsReady] = useState(false)
 
   useEffect(() => {
     if (player) return // Prevent multiple initializations
@@ -167,14 +168,14 @@ const SpotifyWebPlayer: React.FC<SpotifyWebPlayerProps> = ({
     } else {
       window.onSpotifyWebPlaybackSDKReady = initializePlayer
     }
-
     return () => {
       if (player) {
         console.log('Disconnecting Spotify player...')
-        player.disconnect() // eslint-disable-line @typescript-eslint/no-non-null-assertion
+        //@ts-ignore - player.disconnect is not defined in the SpotifyPlayer interface
+        player.disconnect()
       }
     }
-  }, [player])
+  }, [player, onPlayerReady, onPlayerStateChange])
 
   return null
 }

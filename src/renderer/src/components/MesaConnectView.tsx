@@ -1,3 +1,4 @@
+/* eslint-disable react/no-unknown-property */
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useTheme } from './useTheme'
@@ -401,10 +402,11 @@ export default function MesaConnectView(): React.JSX.Element {
           src="https://mesaconnect.io"
           style={{ width: '100%', height: '100%' }}
           useragent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-          allowpopups="true"
+          allowpopups={true}
           webpreferences="contextIsolation=no,nodeIntegration=no,sandbox=no,webSecurity=no,plugins=true,experimentalFeatures=true"
+          // eslint-disable-next-line react/no-unknown-property
           partition="persist:webview"
-          plugins="true"
+          plugins={true}
         />
       </div>
     </div>
